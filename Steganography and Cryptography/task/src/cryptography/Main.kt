@@ -1,69 +1,56 @@
 package cryptography
 
-import java.awt.Color
-import java.awt.image.BufferedImage
 import java.io.File
 import javax.imageio.ImageIO
 
 fun main() {
-    println("Task (hide, show, exit):")
-    when (val action: String = readLine()!!) {
-        "hide" -> hideImageDriver()
-        "show" -> println("Obtaining message from image.")
-        "exit" -> {
-            println("Bye!")
-            return
-        }
-        else -> {
-            println("Wrong task: $action")
+    while(true) {
+        println("Task (hide, show, exit):")
+        readLine().let {
+            when(it) {
+                "exit" -> { println("Bye!"); return }
+                "hide" -> { println("Hiding message in image."); hide() }
+                "show" -> { println("Input image file:"); show() }
+                else -> println("Wrong task: $it")
+            }
         }
     }
 }
 
-fun hideImageDriver() {
+fun show() = mutableListOf<Int>().run {
+    ImageIO.read(File(readLine()!!)).run {
+        for (y in 0 until height) { for (x in 0 until width) { add(getRGB(x, y) and 1) } }
+        val s = java.math.BigInteger(joinToString("").substringBefore("000000000000000000000011"), 2)
+        println("Message:\n${s.toByteArray().toString(Charsets.UTF_8)}")
+    }
+}
+
+fun hide() {
     println("Input image file:")
-
+    val inputFile =  File(readLine()!!)
+    println("Output image file:")
+    val outputFile = File(readLine()!!)
+    println("Message to hide:")
+    val msgToHide = readLine()!!.plus("\u0000\u0000\u0003")
+    val msg = msgToHide.map { Integer.toBinaryString(it.code).padStart(8, '0') }.joinToString("")
     try {
-        val inputImageFileName = readLine()!!
-        val bufferedImage = ImageIO.read(File(inputImageFileName))
-
-        // Setting to 1 the least significant bit for each color (Red, Green, and Blue)
-        val outputImage = hideImageHandler(bufferedImage)
-
-        println("Output image file:")
-        val outputImageFileName = readLine()!!
-
-        println("Input Image: $inputImageFileName")
-        println("Output Image: $outputImageFileName")
-
-        ImageIO.write(outputImage, "png", File(outputImageFileName))
-        println("Image $outputImageFileName is saved.")
-
-    } catch (e: Exception){
-        println("Can't read input file!")
-    }
-    // Repeat "cycle" until "exit" action
-    main()
-}
-
-fun hideImageHandler(inputImage: BufferedImage): BufferedImage {
-
-    for (i in 0 until inputImage.width) {
-        for (j in 0 until inputImage.height) {
-            val color = Color(inputImage.getRGB(i, j))
-
-            val rgb = Color(
-                setLeastSignificantBitToOne(color.red),
-                setLeastSignificantBitToOne(color.green),
-                setLeastSignificantBitToOne(color.blue)
-            ).rgb
-
-            inputImage.setRGB(i, j, rgb)
+        ImageIO.read(inputFile).run {
+            if (msg.length > width * height) throw java.lang.Exception()
+            println("Input Image: ${inputFile.absolutePath}")
+            println("Output Image: ${outputFile.absolutePath}")
+            msg.forEachIndexed { index, c ->
+                setRGB(
+                    index % width,
+                    index / width,
+                    getRGB(index % width, index / width) and 0xFFFFFE or c.toString().toInt()
+                )
+            }
+            ImageIO.write(this, "PNG", outputFile)
         }
+        println("Message saved in ${outputFile.absolutePath} image.")
+    } catch (e: javax.imageio.IIOException) {
+        println("Can't read input file!")
+    } catch (e: java.lang.Exception) {
+        println("The input image is not large enough to hold this message.")
     }
-    return inputImage
-}
-
-fun setLeastSignificantBitToOne(input: Int): Int {
-    return if (input % 2 == 0) input + 1 else input
 }
